@@ -19,15 +19,13 @@ class Message implements Serializable {
 	private String sender;
 	private Date timestamp;
 	private String message;
-	private boolean isEncrypted;
 	private byte[] signature;
 
-	public Message(String recipient, String sender, Date timestamp, String message, boolean isEncrypted, byte[] signature) {
+	public Message(String recipient, String sender, Date timestamp, String message, byte[] signature) {
 		this.recipient = recipient;
 		this.sender = sender;
 		this.timestamp = timestamp;
 		this.message = message;
-		this.isEncrypted = isEncrypted;
 		this.signature = signature;
 	}
 
@@ -45,10 +43,6 @@ class Message implements Serializable {
 
 	public String getMessage() {
 		return message;
-	}
-
-	public boolean isEncrypted() {
-		return isEncrypted;
 	}
 
 	public byte[] getSignature() {
@@ -85,7 +79,7 @@ public class Client {
 	private static String encrypt(String message, String publicKeyFileName) {
 		try {
 			// Read the public key from file
-			FileInputStream publicKeyFile = new FileInputStream("../RSAKeyGen/" + publicKeyFileName + ".pub");
+			FileInputStream publicKeyFile = new FileInputStream(publicKeyFileName + ".pub");
 			ObjectInputStream in = new ObjectInputStream(publicKeyFile);
 			PublicKey publicKey = (PublicKey) in.readObject();
 			in.close();
@@ -115,15 +109,15 @@ public class Client {
 			e.printStackTrace();
 		} 
 
-		// If encryption fails for some reason, return the original message
-		return message;
+		// If encryption fails for some reason, return the null string
+		return null;
 	}
 
 	// Function to decrypt the message
 	private static String decrypt(String message, String privateKeyFileName) {
 		try {
 			// Read the private key from file
-			FileInputStream privateKeyFile = new FileInputStream("../RSAKeyGen/" + privateKeyFileName + ".prv");
+			FileInputStream privateKeyFile = new FileInputStream(privateKeyFileName + ".prv");
 			ObjectInputStream in = new ObjectInputStream(privateKeyFile);
 			PrivateKey privateKey = (PrivateKey) in.readObject();
 			in.close();
@@ -162,7 +156,7 @@ public class Client {
 		try {
 			// Create signature
 			// Read the private key from file
-			FileInputStream privateKeyFile = new FileInputStream("../RSAKeyGen/" + privateKeyFileName + ".prv");
+			FileInputStream privateKeyFile = new FileInputStream(privateKeyFileName + ".prv");
 			ObjectInputStream in = new ObjectInputStream(privateKeyFile);
 			PrivateKey privateKey = (PrivateKey) in.readObject();
 			in.close();
@@ -211,16 +205,18 @@ public class Client {
 				System.out.println("\nEnter your message: ");
 				String message = new BufferedReader(new InputStreamReader(System.in)).readLine();
 			
-				boolean isEncrypted = false;
 				// If the recipient is not "all", then encrypt the message
 				if (!recipient.toLowerCase().equals("all")) {
 					message = encrypt(message, recipient);
-					isEncrypted = true;
+					// If the message is null, then the encryption failed
+					if (message == null) {
+						return null;
+					}
 				}
 				Date timestamp = Calendar.getInstance().getTime();
 				// Sign the message
 				byte[] signature = sign((sender + message + timestamp), sender);
-				return new Message(recipient, sender, timestamp, message, isEncrypted, signature);
+				return new Message(recipient, sender, timestamp, message, signature);
 			}
 			// If user don't want to send a message
 			else {
@@ -236,15 +232,19 @@ public class Client {
 	}
 
 	// Function to send message to server
-	public static void sendMessage(Message message) throws IOException {
-		// Send message to the socket
-		OutputStream outputStream = socket.getOutputStream();
-        // Create an object output stream from the output stream so we can send an object through it
-        ObjectOutputStream objectOutputStream = new ObjectOutputStream(outputStream);
-		objectOutputStream.writeObject(message);
-		return;
+	public static void sendMessage(Message message) {
+		try {
+			// Send message to the socket
+			OutputStream outputStream = socket.getOutputStream();
+			// Create an object output stream from the output stream so we can send an object through it
+			ObjectOutputStream objectOutputStream = new ObjectOutputStream(outputStream);
+			objectOutputStream.writeObject(message);
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
 	}
 
+	// Main function
 	public static void main(String args[]) {
         String host = args[0];
         String port = args[1];
@@ -267,13 +267,7 @@ public class Client {
 				for (Message message : messages) {
 					System.out.println("Sender: " + message.getSender());
 					System.out.println("Timestamp: " + message.getTimestamp());
-					// If the message is encrypted, decrypt it
-					if (message.isEncrypted()) {
-						System.out.println("Message: " + decrypt(message.getMessage(), sender));
-					}
-					else {
-						System.out.println("Message: " + message.getMessage());
-					}
+					System.out.println("Message: " + decrypt(message.getMessage(), sender));
 					System.out.println();
 				}
 

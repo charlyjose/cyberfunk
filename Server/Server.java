@@ -5,23 +5,20 @@ import java.util.Date;
 import java.util.List;
 import java.security.*;
 import java.util.ArrayList;
-import java.io.Serializable;
 
 class Message implements Serializable {
 	private String recipient;
 	private String sender;
 	private Date timestamp;
 	private String message;
-	private boolean isEncrypted;
 	private byte[] signature;
 
-	public Message(String recipient, String sender, Date timestamp, String message, boolean isEncrypted, byte[] signature) {
+	public Message(String recipient, String sender, Date timestamp, String message, byte[] signature) {
 		this.recipient = recipient;
 		this.sender = sender;
 		this.timestamp = timestamp;
 		this.message = message;
-		this.isEncrypted = isEncrypted;
-        this.signature = signature;
+		this.signature = signature;
 	}
 
 	public String getRecipient() {
@@ -40,15 +37,10 @@ class Message implements Serializable {
 		return message;
 	}
 
-	public boolean isEncrypted() {
-		return isEncrypted;
-	}
-
 	public byte[] getSignature() {
 		return signature;
 	}
 }
-
 
 public class Server {
 	// Initialize socket and messages array
@@ -70,7 +62,7 @@ public class Server {
     public static boolean verifySignature(Message message) {
         try {
             // read public key to verify signature
-            FileInputStream publicKeyFile = new FileInputStream("../RSAKeyGen/" + message.getSender() + ".pub");
+            FileInputStream publicKeyFile = new FileInputStream(message.getSender() + ".pub");
             ObjectInputStream in = new ObjectInputStream(publicKeyFile);
             PublicKey publicKey = (PublicKey) in.readObject();
             in.close();
@@ -94,10 +86,9 @@ public class Server {
     }
 
     // Function to handle client requests
-    public static void readMessages(Socket socket) throws IOException, ClassNotFoundException {
+    public static void readMessages(Socket socket) {
         // If client is connected and server is listening
         while(!socket.isClosed() && socket.isConnected()) {
-            System.out.println(!socket.isClosed() + " " + socket.isConnected());
             try {
                 // Get the input stream from the connected socket
                 InputStream inputStream = socket.getInputStream();
@@ -119,7 +110,7 @@ public class Server {
                     messages.add(message);
                 }
                 else {
-                    System.out.println("Signature not verified");
+                    System.out.println("Signature not verified. Discarding message.");
                 }
 
                 // close the socket
@@ -127,6 +118,10 @@ public class Server {
             } catch (IOException e) {
                 // System.out.println("Connection closed");
                 // System.out.println(e.getMessage());
+                e.printStackTrace();
+                break;
+            } catch (ClassNotFoundException e) {
+                e.printStackTrace();
                 break;
             }
         }
@@ -134,13 +129,18 @@ public class Server {
     }
 
     // Function to send messages to client
-	public static void sendMessages(ObjectOutputStream objectOutputStream, List<Message> messages) throws IOException {
-        objectOutputStream.writeObject(messages);
-		return;
+	public static void sendMessages(ObjectOutputStream objectOutputStream, List<Message> messages) {
+        try{
+            // Send the list of messages to the client
+            objectOutputStream.writeObject(messages);
+            return;
+        }  catch (IOException e) {
+            System.out.println(e);
+        }
 	}
 
     // Function to connect to the client
-    private static void connectClient(ServerSocket serverSocket) throws IOException, ClassNotFoundException {
+    private static void connectClient(ServerSocket serverSocket) {
         // Wait for a new client to connect
         while(true) {
             try {
@@ -163,20 +163,31 @@ public class Server {
                 }
                 else {
                     // Close the socket
-                    System.out.println("Client not sending messages");
+                    // System.out.println("Client not sending messages");
                     socket.close();
                 }
-            } catch (IOException e) {
+            } catch (IOException | ClassNotFoundException e) {
                 System.out.println(e.getMessage());
             }
         }
     }
 
-	public static void main(String args[]) throws IOException, ClassNotFoundException {
+    // Main function
+	public static void main(String args[]) throws IOException {
+        try {
         String port = args[0];
         // create a Server object
         new Server(Integer.parseInt(port));
         // Client Connecter
         connectClient(serverSocket);
+        } catch (ArrayIndexOutOfBoundsException e) {
+            System.out.println("Please enter a port number");
+        } catch (NumberFormatException e) {
+            System.out.println("Please enter a valid port number");
+        } catch (Exception e) {
+            System.out.println(e);
+        } finally {
+            serverSocket.close();
+        }
 	}
 }
